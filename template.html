@@ -126,7 +126,7 @@
       font-size: 14px;
     }
     ul.main-list > li::before {
-      content: "🌸";
+      content: var(--bullet, "🌸");
       position: absolute;
       right: 0;
       top: 1px;
@@ -155,6 +155,132 @@
     .editing [contenteditable]:hover { background: rgba(232, 195, 167, 0.12); }
     .editing [contenteditable]:focus { background: rgba(232, 195, 167, 0.2); border-radius: 6px; }
     .logo-img { cursor: pointer; }
+    .letter-container a { color: #c86d51; text-decoration: underline; }
+    .inserted-img {
+      display: block;
+      margin: 10px auto;
+      max-width: 100%;
+      height: auto;
+      border-radius: 10px;
+      cursor: pointer;
+    }
+    .inserted-img.img-s { width: 30%; }
+    .inserted-img.img-m { width: 60%; }
+    .inserted-img.img-l { width: 100%; }
+    .editing .inserted-img.selected { outline: 3px solid #d9886a; outline-offset: 2px; }
+
+    /* emoji picker */
+    .dropdown { position: relative; }
+    .emoji-panel {
+      position: absolute;
+      top: calc(100% + 6px);
+      right: 0;
+      width: 320px;
+      max-width: calc(100vw - 32px);
+      background: #fff;
+      border: 1px solid #e8c3a7;
+      border-radius: 12px;
+      box-shadow: 0 8px 25px rgba(158, 90, 71, 0.18);
+      padding: 10px;
+      z-index: 20;
+    }
+    .emoji-panel[hidden] { display: none; }
+    .emoji-mode { display: flex; gap: 12px; font-size: 13px; color: #9e5a47; margin-bottom: 8px; flex-wrap: wrap; }
+    .emoji-mode label { cursor: pointer; }
+    .emoji-cat { font-size: 12px; color: #b08a76; margin: 8px 0 4px; }
+    .emoji-grid { display: flex; flex-wrap: wrap; gap: 2px; }
+    .toolbar .emoji-grid button {
+      border: none;
+      background: none;
+      font-size: 20px;
+      padding: 3px;
+      border-radius: 6px;
+      line-height: 1;
+    }
+    .emoji-custom { display: flex; gap: 6px; margin-top: 10px; }
+    .emoji-custom input {
+      flex: 1;
+      min-width: 0;
+      font: inherit;
+      font-size: 16px;
+      border: 1px solid #e8c3a7;
+      border-radius: 8px;
+      padding: 4px 8px;
+    }
+    .emoji-tip { font-size: 11px; color: #b08a76; margin-top: 6px; }
+
+    /* link dialog */
+    .link-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 30;
+      background: rgba(74, 59, 50, 0.35);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+    }
+    .link-overlay[hidden] { display: none; }
+    .link-dialog {
+      background: #fffaf5;
+      border: 2px solid #f2d2bd;
+      border-radius: 16px;
+      padding: 18px 20px;
+      width: 100%;
+      max-width: 420px;
+      box-shadow: 0 12px 35px rgba(158, 90, 71, 0.25);
+    }
+    .link-dialog h2 { margin: 0 0 12px; font-size: 18px; color: #9e5a47; }
+    .link-dialog label { display: block; font-size: 13px; color: #9e5a47; margin: 10px 0 4px; font-weight: bold; }
+    .link-dialog input {
+      width: 100%;
+      box-sizing: border-box;
+      font: inherit;
+      font-size: 16px;
+      border: 1px solid #e8c3a7;
+      border-radius: 8px;
+      padding: 8px 10px;
+      background: #fff;
+    }
+    .link-dialog input:focus { outline: 2px solid #d9886a; outline-offset: 0; }
+    .link-dialog .actions { display: flex; gap: 8px; margin-top: 16px; flex-wrap: wrap; }
+    .link-dialog button {
+      font: inherit;
+      font-size: 14px;
+      border: 1px solid #e8c3a7;
+      background: #fff;
+      color: #9e5a47;
+      border-radius: 8px;
+      padding: 7px 16px;
+      cursor: pointer;
+    }
+    .link-dialog button.primary { background: #c86d51; border-color: #c86d51; color: #fff; font-weight: bold; }
+    .link-dialog button.danger { margin-inline-start: auto; }
+
+    /* floating controls for an inserted image */
+    .img-tools {
+      position: absolute;
+      z-index: 15;
+      display: flex;
+      gap: 4px;
+      background: #fff;
+      border: 1px solid #e8c3a7;
+      border-radius: 10px;
+      padding: 4px;
+      box-shadow: 0 4px 14px rgba(158, 90, 71, 0.18);
+    }
+    .img-tools[hidden] { display: none; }
+    .img-tools button {
+      font: inherit;
+      font-size: 13px;
+      border: 1px solid #f2d2bd;
+      background: #fff;
+      color: #9e5a47;
+      border-radius: 6px;
+      padding: 4px 8px;
+      cursor: pointer;
+    }
+    .img-tools button:hover { background: #fdf3eb; }
 
     /* while exporting / printing: no editing highlights */
     .exporting [contenteditable]:hover,
@@ -163,7 +289,8 @@
     @media print {
       @page { size: A4; margin: 10mm; }
       body { background: #fff; }
-      .toolbar, .hint { display: none !important; }
+      .toolbar, .hint, .img-tools, .link-overlay { display: none !important; }
+      .inserted-img.selected { outline: none; }
       .page { padding: 0; }
       .soft-border-wrapper { box-shadow: none; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
       [contenteditable]:hover, [contenteditable]:focus { background: none !important; }
@@ -183,11 +310,50 @@
   <button data-cmd="undo" title="בטל (Ctrl+Z)">↶</button>
   <button data-cmd="redo" title="בצע שוב (Ctrl+Y)">↷</button>
   <span class="sep"></span>
+  <div class="dropdown">
+    <button id="btnEmoji" title="הוספת אימוג'י / החלפת סמל התבליטים">🌸 אימוג'י</button>
+    <div class="emoji-panel" id="emojiPanel" hidden>
+      <div class="emoji-mode">
+        <label><input type="radio" name="emojiMode" value="insert" checked> הוספה במקום הסמן</label>
+        <label><input type="radio" name="emojiMode" value="bullet"> החלפת סמל התבליטים</label>
+      </div>
+      <div id="emojiCats"></div>
+      <div class="emoji-custom">
+        <input id="emojiCustom" placeholder="או הדביקו כאן כל אימוג'י">
+        <button id="emojiCustomBtn">הוספה</button>
+      </div>
+      <div class="emoji-tip">טיפ: במק Ctrl+Cmd+רווח, בווינדוס Win+. פותחים את כל האימוג'ים.</div>
+    </div>
+  </div>
+  <label class="btn" id="btnImg" title="הוספת תמונה במקום הסמן">📷 תמונה<input type="file" id="imgInput" accept="image/*"></label>
+  <button id="btnLink" title="הוספת קישור במקום הסמן, או הפיכת טקסט מסומן לקישור">🔗 קישור</button>
+  <button data-cmd="unlink" title="הסרת קישור מהטקסט המסומן">הסרת קישור</button>
+  <span class="sep"></span>
   <label class="btn" title="החלפת לוגו">🖼 החלפת לוגו<input type="file" id="logoInput" accept="image/*"></label>
   <button id="btnReset" title="חזרה לנוסח המקורי">↺ איפוס</button>
   <span class="status" id="status"></span>
 </div>
-<div class="hint">לחצו על כל טקסט במכתב כדי לערוך אותו. השינויים נשמרים אוטומטית בדפדפן.</div>
+<div class="hint">לחצו על כל טקסט במכתב כדי לערוך אותו. השינויים נשמרים אוטומטית בדפדפן. לפתיחת קישור: Ctrl/Cmd + לחיצה.</div>
+<div class="link-overlay" id="linkOverlay" hidden>
+  <form class="link-dialog" id="linkForm">
+    <h2 id="linkTitle">הוספת קישור</h2>
+    <label for="linkUrl">כתובת הקישור</label>
+    <input id="linkUrl" dir="ltr" inputmode="url" autocomplete="off" placeholder="https://www.example.com">
+    <label for="linkText">הטקסט שיוצג במכתב</label>
+    <input id="linkText" autocomplete="off" placeholder="למשל: לחצו כאן">
+    <div class="actions">
+      <button type="submit" class="primary">אישור</button>
+      <button type="button" id="linkCancel">ביטול</button>
+      <button type="button" class="danger" id="linkRemove" hidden>הסרת הקישור</button>
+    </div>
+  </form>
+</div>
+<div class="img-tools" id="imgTools" hidden>
+  <button data-size="img-s">קטן</button>
+  <button data-size="img-m">בינוני</button>
+  <button data-size="img-l">גדול</button>
+  <button data-act="delete">🗑 מחיקה</button>
+</div>
 
 <div class="page">
 <div class="soft-border-wrapper" id="letter">
@@ -247,7 +413,15 @@
       if (get) return JSON.parse(localStorage.getItem(STORE_KEY) || 'null');
       if (value === null) localStorage.removeItem(STORE_KEY);
       else localStorage.setItem(STORE_KEY, JSON.stringify(value));
-    } catch (e) { return null; }
+      return true;
+    } catch (e) { return get ? null : false; }
+  }
+
+  var bullet = null;
+  function setBullet(emoji) {
+    bullet = emoji;
+    if (emoji) letter.style.setProperty('--bullet', JSON.stringify(emoji));
+    else letter.style.removeProperty('--bullet');
   }
 
   // restore saved edits
@@ -255,19 +429,46 @@
   if (saved && saved.parts && saved.parts.length === editables.length) {
     editables.forEach(function (el, i) { el.innerHTML = saved.parts[i]; });
     if (saved.logo) logo.src = saved.logo;
+    if (saved.bullet) setBullet(saved.bullet);
   }
 
   var saveTimer;
   function save() {
     clearTimeout(saveTimer);
     saveTimer = setTimeout(function () {
-      store(false, {
-        parts: editables.map(function (el) { return el.innerHTML; }),
-        logo: logo.src === defaultLogo ? null : logo.src
+      var ok = store(false, {
+        parts: editables.map(function (el) {
+          var copy = el.cloneNode(true);
+          copy.querySelectorAll('.selected').forEach(function (n) { n.classList.remove('selected'); });
+          return copy.innerHTML;
+        }),
+        logo: logo.src === defaultLogo ? null : logo.src,
+        bullet: bullet
       });
-      statusEl.textContent = 'נשמר ✓';
-      setTimeout(function () { statusEl.textContent = ''; }, 1500);
+      statusEl.textContent = ok ? 'נשמר ✓' : '⚠ אין מקום לשמירה (תמונות גדולות מדי?)';
+      if (ok) setTimeout(function () { statusEl.textContent = ''; }, 1500);
     }, 400);
+  }
+
+  // remember where the cursor was in the letter, so toolbar actions can insert there
+  var lastRange = null;
+  function editableOf(node) {
+    for (var i = 0; i < editables.length; i++) if (editables[i].contains(node)) return editables[i];
+    return null;
+  }
+  document.addEventListener('selectionchange', function () {
+    var sel = window.getSelection();
+    if (sel.rangeCount && editableOf(sel.getRangeAt(0).commonAncestorContainer)) {
+      lastRange = sel.getRangeAt(0).cloneRange();
+    }
+  });
+  function restoreSelection() {
+    if (!lastRange || !editableOf(lastRange.commonAncestorContainer)) return false;
+    editableOf(lastRange.commonAncestorContainer).focus();
+    var sel = window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(lastRange);
+    return true;
   }
   editables.forEach(function (el) { el.addEventListener('input', save); });
 
@@ -278,6 +479,229 @@
       document.execCommand(btn.dataset.cmd, false, null);
       save();
     });
+  });
+
+  // ---------- emoji picker ----------
+  var EMOJIS = {
+    'פרחים וטבע': '🌸 🌷 🌹 🌺 🌻 🌼 💐 🌿 🍀 🌱 🌾 🍂 🍁 ☀️ 🌈 ⭐ 🌟 ✨ 🦋 🐝',
+    'חגים ומסורת': '🍎 🍯 🕯️ 🕎 🍩 🎭 🫓 🍷 🌙 🇮🇱 📜 ✡️ 🎉 🎊 🎁 🥳 🎈',
+    'בית ספר': '📚 📖 ✏️ 📝 🖍️ 🎒 🏫 🧮 🔬 🎨 🎵 ⚽ 🏆 🥇 📅 ⏰ 📌 📣 💡',
+    'לבבות ורגש': '❤️ 🧡 💛 💚 💙 💜 🤍 💕 💖 😊 😃 🥰 🤗 👏 🙌 💪 🙏 👍 🤝',
+    'סימנים': '✅ ☑️ ✔️ ❗ ❓ ⚠️ 🔹 🔸 🔶 🔷 ▪️ ➡️ ⬅️ 👉 👈 📍 🔔 💬'
+  };
+  var emojiPanel = document.getElementById('emojiPanel');
+  var emojiCats = document.getElementById('emojiCats');
+  Object.keys(EMOJIS).forEach(function (cat) {
+    var title = document.createElement('div');
+    title.className = 'emoji-cat';
+    title.textContent = cat;
+    var grid = document.createElement('div');
+    grid.className = 'emoji-grid';
+    EMOJIS[cat].split(' ').forEach(function (e) {
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.textContent = e;
+      b.addEventListener('mousedown', function (ev) { ev.preventDefault(); });
+      b.addEventListener('click', function () { useEmoji(e); });
+      grid.appendChild(b);
+    });
+    emojiCats.appendChild(title);
+    emojiCats.appendChild(grid);
+  });
+
+  function useEmoji(e) {
+    var mode = document.querySelector('input[name=emojiMode]:checked').value;
+    if (mode === 'bullet') {
+      setBullet(e);
+      save();
+      return;
+    }
+    if (!restoreSelection()) {
+      alert('לחצו קודם במקום בטקסט שבו תרצו להוסיף את האימוג\'י.');
+      return;
+    }
+    document.execCommand('insertText', false, e);
+    save();
+  }
+
+  var btnEmoji = document.getElementById('btnEmoji');
+  btnEmoji.addEventListener('mousedown', function (e) { e.preventDefault(); });
+  btnEmoji.addEventListener('click', function () { emojiPanel.hidden = !emojiPanel.hidden; });
+  document.addEventListener('mousedown', function (e) {
+    if (!emojiPanel.hidden && !emojiPanel.contains(e.target) && e.target !== btnEmoji) emojiPanel.hidden = true;
+  });
+  var emojiCustom = document.getElementById('emojiCustom');
+  function useCustomEmoji() {
+    var v = emojiCustom.value.trim();
+    if (!v) return;
+    useEmoji(v);
+    emojiCustom.value = '';
+  }
+  document.getElementById('emojiCustomBtn').addEventListener('click', useCustomEmoji);
+  emojiCustom.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); useCustomEmoji(); } });
+
+  // ---------- insert image at cursor ----------
+  var imgInput = document.getElementById('imgInput');
+  document.getElementById('btnImg').addEventListener('mousedown', function (e) { e.preventDefault(); });
+  imgInput.addEventListener('change', function () {
+    var file = imgInput.files[0];
+    imgInput.value = '';
+    if (!file) return;
+    shrinkImage(file, 1000, function (dataUrl) {
+      var html = '<img class="inserted-img img-m" src="' + dataUrl + '" alt="">';
+      if (restoreSelection()) {
+        document.execCommand('insertHTML', false, html);
+      } else {
+        document.getElementById('body').insertAdjacentHTML('beforeend', html);
+      }
+      save();
+    });
+  });
+
+  // scale photos down so they fit in browser storage and keep the PDF small
+  function shrinkImage(file, maxSide, done) {
+    var reader = new FileReader();
+    reader.onload = function () {
+      var img = new Image();
+      img.onload = function () {
+        var scale = Math.min(1, maxSide / Math.max(img.width, img.height));
+        var c = document.createElement('canvas');
+        c.width = Math.round(img.width * scale);
+        c.height = Math.round(img.height * scale);
+        var ctx = c.getContext('2d');
+        var png = file.type === 'image/png' || file.type === 'image/gif';
+        if (!png) { ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, c.width, c.height); }
+        ctx.drawImage(img, 0, 0, c.width, c.height);
+        done(png ? c.toDataURL('image/png') : c.toDataURL('image/jpeg', 0.85));
+      };
+      img.onerror = function () { alert('לא ניתן לקרוא את הקובץ כתמונה.'); };
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+  }
+
+  // click an inserted image -> resize / delete controls
+  var imgTools = document.getElementById('imgTools');
+  var selectedImg = null;
+  function selectImg(img) {
+    if (selectedImg) selectedImg.classList.remove('selected');
+    selectedImg = img;
+    if (!img) { imgTools.hidden = true; return; }
+    img.classList.add('selected');
+    imgTools.hidden = false;
+    var r = img.getBoundingClientRect();
+    imgTools.style.top = (window.scrollY + r.top + 8) + 'px';
+    imgTools.style.left = (window.scrollX + r.left + r.width / 2 - imgTools.offsetWidth / 2) + 'px';
+  }
+  letter.addEventListener('click', function (e) {
+    selectImg(e.target.classList && e.target.classList.contains('inserted-img') ? e.target : null);
+  });
+  document.addEventListener('mousedown', function (e) {
+    if (selectedImg && !imgTools.contains(e.target) && e.target !== selectedImg) selectImg(null);
+  });
+  imgTools.addEventListener('click', function (e) {
+    var b = e.target.closest('button');
+    if (!b || !selectedImg) return;
+    if (b.dataset.act === 'delete') {
+      selectedImg.remove();
+      selectImg(null);
+    } else {
+      selectedImg.classList.remove('img-s', 'img-m', 'img-l');
+      selectedImg.classList.add(b.dataset.size);
+      selectImg(selectedImg);
+    }
+    save();
+  });
+  window.addEventListener('resize', function () { if (selectedImg) selectImg(selectedImg); });
+
+  // ---------- links ----------
+  var linkOverlay = document.getElementById('linkOverlay');
+  var linkForm = document.getElementById('linkForm');
+  var linkUrl = document.getElementById('linkUrl');
+  var linkText = document.getElementById('linkText');
+  var linkRemove = document.getElementById('linkRemove');
+  var linkRange = null, linkEditing = null, linkOrigText = '';
+
+  function escapeHtml(t) {
+    return t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+  function normalizeUrl(url) {
+    url = url.trim();
+    if (!url) return '';
+    if (/^[a-z][a-z0-9+.-]*:/i.test(url)) return url;
+    return (url.indexOf('@') > 0 && url.indexOf('/') < 0 ? 'mailto:' : 'https://') + url;
+  }
+  function closeLinkDialog() {
+    linkOverlay.hidden = true;
+    restoreSelection();
+  }
+
+  var btnLink = document.getElementById('btnLink');
+  btnLink.addEventListener('mousedown', function (e) { e.preventDefault(); });
+  btnLink.addEventListener('click', function () {
+    if (!lastRange || !editableOf(lastRange.commonAncestorContainer)) {
+      alert('לחצו קודם במקום בטקסט שבו תרצו להוסיף את הקישור (או סמנו טקסט).');
+      return;
+    }
+    linkRange = lastRange.cloneRange();
+    var node = linkRange.startContainer;
+    linkEditing = (node.nodeType === 1 ? node : node.parentElement).closest('a');
+    if (linkEditing && !letter.contains(linkEditing)) linkEditing = null;
+
+    if (linkEditing) {
+      linkUrl.value = linkEditing.getAttribute('href') || '';
+      linkText.value = linkEditing.textContent;
+    } else {
+      linkUrl.value = '';
+      linkText.value = linkRange.toString();
+    }
+    linkOrigText = linkText.value;
+    document.getElementById('linkTitle').textContent = linkEditing ? 'עריכת קישור' : 'הוספת קישור';
+    linkRemove.hidden = !linkEditing;
+    linkOverlay.hidden = false;
+    linkUrl.focus();
+  });
+
+  linkForm.addEventListener('submit', function (e) {
+    e.preventDefault();
+    var url = normalizeUrl(linkUrl.value);
+    if (!url) { linkUrl.focus(); return; }
+    var text = linkText.value.trim() || linkUrl.value.trim();
+    linkOverlay.hidden = true;
+
+    if (linkEditing) {
+      linkEditing.setAttribute('href', url);
+      if (text !== linkOrigText) linkEditing.textContent = text;
+    } else {
+      lastRange = linkRange;
+      restoreSelection();
+      if (!linkRange.collapsed && text === linkOrigText.trim()) {
+        // keep the selected text (and its formatting), just turn it into a link
+        document.execCommand('createLink', false, url);
+      } else {
+        // don't glue a new link onto the preceding word
+        if (linkRange.collapsed && linkRange.startContainer.nodeType === 3 && linkRange.startOffset > 0 &&
+            !/\s/.test(linkRange.startContainer.textContent.charAt(linkRange.startOffset - 1))) {
+          document.execCommand('insertText', false, ' ');
+        }
+        document.execCommand('insertHTML', false, '<a href="' + escapeHtml(url) + '">' + escapeHtml(text) + '</a>');
+      }
+    }
+    letter.querySelectorAll('a').forEach(function (a) { a.target = '_blank'; a.rel = 'noopener'; });
+    save();
+  });
+  document.getElementById('linkCancel').addEventListener('click', closeLinkDialog);
+  linkRemove.addEventListener('click', function () {
+    if (linkEditing) linkEditing.replaceWith(document.createTextNode(linkEditing.textContent));
+    linkOverlay.hidden = true;
+    save();
+  });
+  linkOverlay.addEventListener('mousedown', function (e) { if (e.target === linkOverlay) closeLinkDialog(); });
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && !linkOverlay.hidden) closeLinkDialog(); });
+  // links can't be followed by a plain click while editing; Ctrl/Cmd+click opens them
+  letter.addEventListener('click', function (e) {
+    var a = e.target.closest && e.target.closest('a');
+    if (a && (e.ctrlKey || e.metaKey)) { e.preventDefault(); window.open(a.href, '_blank', 'noopener'); }
   });
 
   // logo replacement
@@ -322,7 +746,10 @@
     var clone = letter.cloneNode(true);
     clone.removeAttribute('id');
     clone.setAttribute('dir', 'rtl');
-    clone.style.cssText = 'margin:0;max-width:none;box-shadow:none';
+    clone.style.margin = '0';
+    clone.style.maxWidth = 'none';
+    clone.style.boxShadow = 'none';
+    clone.querySelectorAll('.selected').forEach(function (n) { n.classList.remove('selected'); });
     box.appendChild(clone);
     document.body.classList.add('exporting');
     document.body.appendChild(box);
@@ -332,23 +759,49 @@
     htmlToImage.toCanvas(box, { pixelRatio: 2.5, backgroundColor: '#ffffff' }).then(function (canvas) {
       var pdf = new window.jspdf.jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait' });
       var margin = 8, pageW = 210 - margin * 2, pageH = 297 - margin * 2;
-      var imgH = canvas.height * pageW / canvas.width;
-      if (imgH <= pageH) {
-        pdf.addImage(canvas.toDataURL('image/jpeg', 0.95), 'JPEG', margin, margin, pageW, imgH);
-      } else {
-        // longer than one page: slice the image into page-height pieces
-        var slicePx = Math.floor(canvas.width * pageH / pageW);
-        for (var y = 0, first = true; y < canvas.height; y += slicePx, first = false) {
-          var h = Math.min(slicePx, canvas.height - y);
-          var part = document.createElement('canvas');
-          part.width = canvas.width; part.height = h;
-          var ctx = part.getContext('2d');
-          ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, part.width, h);
-          ctx.drawImage(canvas, 0, y, canvas.width, h, 0, 0, canvas.width, h);
-          if (!first) pdf.addPage();
-          pdf.addImage(part.toDataURL('image/jpeg', 0.95), 'JPEG', margin, margin, pageW, h * pageW / canvas.width);
+      var boxRect = box.getBoundingClientRect();
+      var pxPerCss = canvas.width / boxRect.width;        // canvas pixels per CSS pixel
+      var slicePx = Math.floor(canvas.width * pageH / pageW); // canvas pixels that fit on one page
+
+      // page breaks only between blocks (paragraphs, list items, images), never through a line of text
+      var breaks = Array.prototype.map.call(
+        clone.querySelectorAll('.header-box, p, li, .highlight-box, .inserted-img, .footer'),
+        function (el) { return Math.round((el.getBoundingClientRect().bottom - boxRect.top) * pxPerCss); }
+      ).sort(function (x, y) { return x - y; });
+      var starts = [];
+      for (var y = 0; y < canvas.height;) {
+        starts.push(y);
+        var end = y + slicePx;
+        if (end < canvas.height) {
+          var best = 0;
+          breaks.forEach(function (bp) { if (bp > y + slicePx * 0.4 && bp <= end) best = bp; });
+          if (best) end = best;
         }
+        y = Math.min(end, canvas.height);
       }
+
+      starts.forEach(function (y, i) {
+        var h = (i + 1 < starts.length ? starts[i + 1] : canvas.height) - y;
+        var part = document.createElement('canvas');
+        part.width = canvas.width; part.height = h;
+        var ctx = part.getContext('2d');
+        ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, part.width, h);
+        ctx.drawImage(canvas, 0, y, canvas.width, h, 0, 0, canvas.width, h);
+        if (i > 0) pdf.addPage();
+        pdf.addImage(part.toDataURL('image/jpeg', 0.95), 'JPEG', margin, margin, pageW, h * pageW / canvas.width);
+      });
+
+      // make links clickable in the PDF: map each link's on-screen box to its page
+      var mmPerPx = pageW / boxRect.width;
+      clone.querySelectorAll('a[href]').forEach(function (a) {
+        Array.prototype.forEach.call(a.getClientRects(), function (r) {
+          var top = (r.top - boxRect.top) * pxPerCss, page = 0;
+          while (page + 1 < starts.length && starts[page + 1] <= top) page++;
+          pdf.setPage(page + 1);
+          pdf.link(margin + (r.left - boxRect.left) * mmPerPx, margin + (top - starts[page]) / pxPerCss * mmPerPx,
+                   r.width * mmPerPx, r.height * mmPerPx, { url: a.href });
+        });
+      });
       pdf.save(title + '.pdf');
     }).catch(function (err) {
       console.error(err);
