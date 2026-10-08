@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>עורך מכתב שבועי</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html-to-image/1.11.11/html-to-image.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <style>
+    body {
+      font-family: "Segoe UI", Arial, sans-serif;
+      margin: 0;
+      color: #4a3b32;
+      background-color: #faf0e6;
+      direction: rtl;
+    }
+
+    /* ---------- toolbar ---------- */
+    .toolbar {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      align-items: center;
+      justify-content: center;
+      padding: 10px 16px;
+      background: #fffaf5;
+      border-bottom: 1px solid #f2d2bd;
+      box-shadow: 0 2px 10px rgba(158, 90, 71, 0.08);
+    }
+    .toolbar button, .toolbar label.btn {
+      font: inherit;
+      font-size: 14px;
+      border: 1px solid #e8c3a7;
+      background: #fff;
+      color: #9e5a47;
+      border-radius: 8px;
+      padding: 6px 12px;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .toolbar button:hover, .toolbar label.btn:hover { background: #fdf3eb; }
+    .toolbar .primary {
+      background: #c86d51;
+      border-color: #c86d51;
+      color: #fff;
+      font-weight: bold;
+    }
+    .toolbar .primary:hover { background: #9e5a47; }
+    .toolbar .sep { width: 1px; height: 24px; background: #f2d2bd; margin: 0 4px; }
+    .toolbar input[type=file] { display: none; }
+    .toolbar .status { font-size: 12px; color: #b08a76; min-width: 60px; }
+    .hint {
+      text-align: center;
+      font-size: 13px;
+      color: #b08a76;
+      margin: 12px 16px 0;
+    }
+
+    /* ---------- letter (from original design) ---------- */
+    .page { padding: 20px 16px 40px; }
+    .soft-border-wrapper {
+      background: linear-gradient(135deg, #fbe8d3 0%, #f7d6bf 50%, #f3c5a8 100%);
+      padding: 12px;
+      border-radius: 24px;
+      box-shadow: 0 8px 25px rgba(212, 163, 115, 0.15);
+      max-width: 800px;
+      margin: 0 auto;
+    }
+    .letter-container {
+      background-color: #fffaf5;
+      border: 2px solid #f2d2bd;
+      border-radius: 18px;
+      padding: 25px 30px;
+    }
+    .header-box {
+      text-align: center;
+      margin-bottom: 15px;
+      border-bottom: 2px dashed #e8c3a7;
+      padding-bottom: 12px;
+    }
+    .logo-img {
+      max-width: 200px;
+      height: auto;
+      margin-bottom: 8px;
+    }
+    h1 {
+      color: #9e5a47;
+      margin: 0;
+      font-size: 22px;
+      font-weight: 700;
+    }
+    .sub-title {
+      color: #c86d51;
+      font-size: 16px;
+      font-weight: bold;
+      margin-top: 5px;
+    }
+    p {
+      line-height: 1.6;
+      font-size: 14px;
+      margin: 0 0 10px;
+    }
+    .highlight-box {
+      background-color: #fdf3eb;
+      border-right: 5px solid #d9886a;
+      border-radius: 10px;
+      padding: 10px 15px;
+      margin: 15px 0;
+      font-weight: bold;
+      color: #8c4331;
+      font-size: 15px;
+    }
+    ul.main-list {
+      list-style-type: none;
+      padding-right: 5px;
+      margin: 0;
+    }
+    ul.main-list > li {
+      position: relative;
+      padding-right: 22px;
+      margin-bottom: 10px;
+      line-height: 1.5;
+      font-size: 14px;
+    }
+    ul.main-list > li::before {
+      content: "🌸";
+      position: absolute;
+      right: 0;
+      top: 1px;
+    }
+    ul.sub-list, ul.main-list ul {
+      list-style-type: disc;
+      padding-right: 25px;
+      margin-top: 5px;
+      margin-bottom: 5px;
+    }
+    ul.sub-list li, ul.main-list ul li { margin-bottom: 3px; padding-right: 0; }
+    ul.main-list ul li::before { content: none; }
+    .footer {
+      margin-top: 20px;
+      border-top: 1.5px dashed #e8c3a7;
+      padding-top: 12px;
+      text-align: center;
+      color: #9e5a47;
+      font-size: 15px;
+      font-weight: bold;
+      line-height: 1.4;
+    }
+
+    /* ---------- editing affordances ---------- */
+    [contenteditable] { outline: none; }
+    .editing [contenteditable]:hover { background: rgba(232, 195, 167, 0.12); }
+    .editing [contenteditable]:focus { background: rgba(232, 195, 167, 0.2); border-radius: 6px; }
+    .logo-img { cursor: pointer; }
+
+    /* while exporting / printing: no editing highlights */
+    .exporting [contenteditable]:hover,
+    .exporting [contenteditable]:focus { background: none !important; }
+
+    @media print {
+      @page { size: A4; margin: 10mm; }
+      body { background: #fff; }
+      .toolbar, .hint { display: none !important; }
+      .page { padding: 0; }
+      .soft-border-wrapper { box-shadow: none; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      [contenteditable]:hover, [contenteditable]:focus { background: none !important; }
+    }
+  </style>
+</head>
+<body class="editing">
+
+<div class="toolbar">
+  <button class="primary" id="btnPdf">⬇ ייצוא ל-PDF</button>
+  <button id="btnPrint" title="הדפסה / שמירה כ-PDF דרך הדפדפן">🖨 הדפסה</button>
+  <span class="sep"></span>
+  <button data-cmd="bold" title="מודגש (Ctrl+B)"><b>B</b></button>
+  <button data-cmd="italic" title="נטוי (Ctrl+I)"><i>I</i></button>
+  <button data-cmd="underline" title="קו תחתון (Ctrl+U)"><u>U</u></button>
+  <button data-cmd="insertUnorderedList" title="רשימת תבליטים">• רשימה</button>
+  <button data-cmd="undo" title="בטל (Ctrl+Z)">↶</button>
+  <button data-cmd="redo" title="בצע שוב (Ctrl+Y)">↷</button>
+  <span class="sep"></span>
+  <label class="btn" title="החלפת לוגו">🖼 החלפת לוגו<input type="file" id="logoInput" accept="image/*"></label>
+  <button id="btnReset" title="חזרה לנוסח המקורי">↺ איפוס</button>
+  <span class="status" id="status"></span>
+</div>
+<div class="hint">לחצו על כל טקסט במכתב כדי לערוך אותו. השינויים נשמרים אוטומטית בדפדפן.</div>
+
+<div class="page">
+<div class="soft-border-wrapper" id="letter">
+  <div class="letter-container">
+    <div class="header-box">
+      <img src="__LOGO__" class="logo-img" id="logo" alt="לוגו חטיבת נעורים עומר" title="לחצו להחלפת הלוגו"><br>
+      <h1 contenteditable="true">עדכון שבועי להורי שכבת ז'</h1>
+      <div class="sub-title" contenteditable="true">גמר חתימה טובה!</div>
+    </div>
+
+    <div class="body-text" contenteditable="true" id="body">
+      <p><strong>הורים יקרים שלום רב, 🌷</strong></p>
+
+      <p>עם סיומו של עוד שבוע גדוש בעשייה, אני שמחה לפנות אליכם ולשתף במעט ממה שעובר על שכבת ז' שלנו.</p>
+
+      <p>בתקופה זו, התלמידים והתלמידות נמצאים בעיצומה של הסתגלות לאורחות החיים בחטיבה – החל מהכרת הסביבה החדשה, דרך התמודדות עם מערכת השעות והדרישות הלימודיות, ועד ליצירת קשרים חדשים. אנו רואים את המאמץ והסקרנות שלהם מדי יום, ומלווים אותם מקרוב בכל צעד. כאן המקום להודות לכם על האמון ושיתוף הפעולה.</p>
+
+      <p>לקראת יום הכיפורים והחופשה הקרבה, ברצוני לתזכר ולהדגיש את חשיבותם של המפגשים החברתיים גם מחוץ לשעות הלימודים, ומילוי ימי החופש במפגשים משותפים וביצירת חוויות מחוץ לכותלי החטיבה.</p>
+
+      <p>לצד זאת, זהו זמן מצוין להדגיש את ערך הערבות ההדדית והרגישות לזולת. אנא שוחחו עם הילדים בבית והזכירו להם לשים לב לחבריהם, לוודא שאף אחד לא נשאר לבד, שכולם מוזמנים ושכולם מרגישים חלק מהקבוצה. הם בכיתה ז' ובוגרים מספיק לשים לב לסביבה שלהם; עם זאת, חשוב לבדוק ולוודא גם בקבוצות ההורים שאף אחד לא נשאר לבד! יש ילדים שלא הגיעו מבתי הספר היסודיים המזינים את החטיבה, וחשוב לראות שהחופשה של כולם תעבור בנעימים ועם חברה נכונה!</p>
+
+      <div class="highlight-box">עדכונים והודעות חשובות:</div>
+
+      <ul class="main-list">
+        <li><strong>ציון אירועי 7 באוקטובר:</strong> מיד עם חזרתנו מהחופשה, נציין בכיתות את אירועי ה-7/10 בפעילויות תואמות גיל.</li>
+        <li><strong>לוח אירועי הערכה:</strong> אנא להתעדכן בלוח המבחנים והמבדקים שנשלח אליכם במערכת "סקולי". המבדקים והמבחנים יחלו מיד לאחר החופשה. חומרים ומיקוד לקראת כל מבדק יישלחו ב"סקולי" על ידי הצוות המקצועי.
+          <ul class="sub-list">
+            <li><strong>6/10:</strong> מיפוי במדעים</li>
+            <li><strong>8/10:</strong> מבדק בעברית</li>
+            <li><strong>13/10:</strong> מבדק במתמטיקה</li>
+          </ul>
+        </li>
+        <li><strong>תקנון בית הספר:</strong> תקנון בית הספר יישלח ביום שלישי על ידי המנהלת ליאת. נבקשכם לשים לב ולחתום דיגיטלית על אישור קריאת התקנון.</li>
+        <li><strong>בחירת קמפוסים:</strong> ביום שלישי תשלח אליכם מצגת מסודרת עם הסבר קצר על כל קמפוס (במקביל, המורים נכנסו לכיתות והציגו את הקמפוסים השונים לתלמידים). לאחר שתעברו על המצגת, יש לבצע דיגיטלית 4 דירוגים לפי סדר העדפה. בסופו של דבר, כל תלמיד ותלמידה ישובצו באחת מבחירותיהם.</li>
+      </ul>
+    </div>
+
+    <div class="footer" contenteditable="true">
+      בברכת חתימה טובה וצום קל ומועיל לצמים,<br>
+      ינה מילצ'ין – רכזת השכבה
+    </div>
+  </div>
+</div>
+</div>
+
+<script>
+(function () {
+  var STORE_KEY = 'weekly-letter-v1';
+  var letter = document.getElementById('letter');
+  var logo = document.getElementById('logo');
+  var statusEl = document.getElementById('status');
+  var editables = Array.prototype.slice.call(letter.querySelectorAll('[contenteditable]'));
+  var defaultLogo = logo.src;
+
+  function store(get, value) {
+    try {
+      if (get) return JSON.parse(localStorage.getItem(STORE_KEY) || 'null');
+      if (value === null) localStorage.removeItem(STORE_KEY);
+      else localStorage.setItem(STORE_KEY, JSON.stringify(value));
+    } catch (e) { return null; }
+  }
+
+  // restore saved edits
+  var saved = store(true);
+  if (saved && saved.parts && saved.parts.length === editables.length) {
+    editables.forEach(function (el, i) { el.innerHTML = saved.parts[i]; });
+    if (saved.logo) logo.src = saved.logo;
+  }
+
+  var saveTimer;
+  function save() {
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(function () {
+      store(false, {
+        parts: editables.map(function (el) { return el.innerHTML; }),
+        logo: logo.src === defaultLogo ? null : logo.src
+      });
+      statusEl.textContent = 'נשמר ✓';
+      setTimeout(function () { statusEl.textContent = ''; }, 1500);
+    }, 400);
+  }
+  editables.forEach(function (el) { el.addEventListener('input', save); });
+
+  // formatting buttons
+  document.querySelectorAll('[data-cmd]').forEach(function (btn) {
+    btn.addEventListener('mousedown', function (e) { e.preventDefault(); }); // keep selection
+    btn.addEventListener('click', function () {
+      document.execCommand(btn.dataset.cmd, false, null);
+      save();
+    });
+  });
+
+  // logo replacement
+  var logoInput = document.getElementById('logoInput');
+  logo.addEventListener('click', function () { logoInput.click(); });
+  logoInput.addEventListener('change', function () {
+    var file = logoInput.files[0];
+    if (!file) return;
+    var reader = new FileReader();
+    reader.onload = function () { logo.src = reader.result; save(); };
+    reader.readAsDataURL(file);
+    logoInput.value = '';
+  });
+
+  // reset
+  document.getElementById('btnReset').addEventListener('click', function () {
+    if (!confirm('לחזור לנוסח המקורי? כל השינויים יימחקו.')) return;
+    store(false, null);
+    location.reload();
+  });
+
+  // print
+  document.getElementById('btnPrint').addEventListener('click', function () {
+    if (document.activeElement) document.activeElement.blur();
+    window.print();
+  });
+
+  // PDF export — html-to-image uses the browser's own text layout, so Hebrew/RTL stays correct
+  var btnPdf = document.getElementById('btnPdf');
+  btnPdf.addEventListener('click', function () {
+    if (typeof htmlToImage === 'undefined' || !window.jspdf) {
+      alert('ספריית ה-PDF לא נטענה (אין חיבור לאינטרנט?). השתמשו בכפתור "הדפסה" ובחרו "שמירה כ-PDF".');
+      return;
+    }
+    if (document.activeElement) document.activeElement.blur();
+    var title = (letter.querySelector('h1').innerText || 'מכתב').trim().replace(/[\\/:*?"<>|]/g, '');
+
+    // render a clone in an LTR box at a fixed width (RTL documents otherwise get shifted when captured)
+    var box = document.createElement('div');
+    box.setAttribute('dir', 'ltr');
+    box.style.cssText = 'position:fixed;left:0;top:0;width:760px;z-index:-1;background:#fff';
+    var clone = letter.cloneNode(true);
+    clone.removeAttribute('id');
+    clone.setAttribute('dir', 'rtl');
+    clone.style.cssText = 'margin:0;max-width:none;box-shadow:none';
+    box.appendChild(clone);
+    document.body.classList.add('exporting');
+    document.body.appendChild(box);
+
+    btnPdf.disabled = true;
+    btnPdf.textContent = 'מייצא...';
+    htmlToImage.toCanvas(box, { pixelRatio: 2.5, backgroundColor: '#ffffff' }).then(function (canvas) {
+      var pdf = new window.jspdf.jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait' });
+      var margin = 8, pageW = 210 - margin * 2, pageH = 297 - margin * 2;
+      var imgH = canvas.height * pageW / canvas.width;
+      if (imgH <= pageH) {
+        pdf.addImage(canvas.toDataURL('image/jpeg', 0.95), 'JPEG', margin, margin, pageW, imgH);
+      } else {
+        // longer than one page: slice the image into page-height pieces
+        var slicePx = Math.floor(canvas.width * pageH / pageW);
+        for (var y = 0, first = true; y < canvas.height; y += slicePx, first = false) {
+          var h = Math.min(slicePx, canvas.height - y);
+          var part = document.createElement('canvas');
+          part.width = canvas.width; part.height = h;
+          var ctx = part.getContext('2d');
+          ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, part.width, h);
+          ctx.drawImage(canvas, 0, y, canvas.width, h, 0, 0, canvas.width, h);
+          if (!first) pdf.addPage();
+          pdf.addImage(part.toDataURL('image/jpeg', 0.95), 'JPEG', margin, margin, pageW, h * pageW / canvas.width);
+        }
+      }
+      pdf.save(title + '.pdf');
+    }).catch(function (err) {
+      console.error(err);
+      alert('הייצוא נכשל. נסו את כפתור "הדפסה" ובחרו "שמירה כ-PDF".');
+    }).then(function () {
+      box.remove();
+      document.body.classList.remove('exporting');
+      btnPdf.disabled = false;
+      btnPdf.textContent = '⬇ ייצוא ל-PDF';
+    });
+  });
+})();
+</script>
+</body>
+</html>
