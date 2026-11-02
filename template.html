@@ -98,6 +98,12 @@
       font-weight: bold;
       margin-top: 5px;
     }
+    /* explicit size/spacing so pasted text (divs, line breaks) matches paragraphs
+       and lays out identically in the PDF renderer ("normal" line-height drifts) */
+    .body-text {
+      font-size: 14px;
+      line-height: 1.6;
+    }
     p {
       line-height: 1.6;
       font-size: 14px;
@@ -406,6 +412,7 @@
   var logo = document.getElementById('logo');
   var statusEl = document.getElementById('status');
   var editables = Array.prototype.slice.call(letter.querySelectorAll('[contenteditable]'));
+  try { document.execCommand('defaultParagraphSeparator', false, 'p'); } catch (e) {}
   var defaultLogo = logo.src;
 
   function store(get, value) {
@@ -739,75 +746,133 @@
     if (document.activeElement) document.activeElement.blur();
     var title = (letter.querySelector('h1').innerText || 'מכתב').trim().replace(/[\\/:*?"<>|]/g, '');
 
-    // render a clone in an LTR box at a fixed width (RTL documents otherwise get shifted when captured)
-    var box = document.createElement('div');
-    box.setAttribute('dir', 'ltr');
-    box.style.cssText = 'position:fixed;left:0;top:0;width:760px;z-index:-1;background:#fff';
-    var clone = letter.cloneNode(true);
-    clone.removeAttribute('id');
-    clone.setAttribute('dir', 'rtl');
-    clone.style.margin = '0';
-    clone.style.maxWidth = 'none';
-    clone.style.boxShadow = 'none';
-    clone.querySelectorAll('.selected').forEach(function (n) { n.classList.remove('selected'); });
-    box.appendChild(clone);
-    document.body.classList.add('exporting');
-    document.body.appendChild(box);
+    var BOX_W = 760;                                        // CSS px width the letter is laid out at
+    var margin = 8, pageW = 210 - margin * 2, pageH = 297 - margin * 2;   // mm
+    var pageCss = Math.floor(BOX_W * pageH / pageW);        // CSS px of letter that fit on one PDF page
 
+    function cleanClone() {
+      var c = letter.cloneNode(true);
+      c.removeAttribute('id');
+      c.setAttribute('dir', 'rtl');
+      c.style.margin = '0';
+      c.style.maxWidth = 'none';
+      c.style.boxShadow = 'none';
+      c.querySelectorAll('.selected').forEach(function (n) { n.classList.remove('selected'); });
+      return c;
+    }
+    // an LTR box at a fixed width (RTL documents otherwise get shifted when captured)
+    function makeBox(content) {
+      var box = document.createElement('div');
+      box.setAttribute('dir', 'ltr');
+      box.style.cssText = 'position:fixed;left:0;top:0;width:' + BOX_W + 'px;z-index:-1;background:#fff';
+      box.appendChild(content);
+      document.body.appendChild(box);
+      return box;
+    }
+
+    document.body.classList.add('exporting');
     btnPdf.disabled = true;
     btnPdf.textContent = 'מייצא...';
-    htmlToImage.toCanvas(box, { pixelRatio: 2.5, backgroundColor: '#ffffff' }).then(function (canvas) {
-      var pdf = new window.jspdf.jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait' });
-      var margin = 8, pageW = 210 - margin * 2, pageH = 297 - margin * 2;
-      var boxRect = box.getBoundingClientRect();
-      var pxPerCss = canvas.width / boxRect.width;        // canvas pixels per CSS pixel
-      var slicePx = Math.floor(canvas.width * pageH / pageW); // canvas pixels that fit on one page
 
-      // page breaks only between blocks (paragraphs, list items, images), never through a line of text
-      var breaks = Array.prototype.map.call(
-        clone.querySelectorAll('.header-box, p, li, .highlight-box, .inserted-img, .footer'),
-        function (el) { return Math.round((el.getBoundingClientRect().bottom - boxRect.top) * pxPerCss); }
-      ).sort(function (x, y) { return x - y; });
-      var starts = [];
-      for (var y = 0; y < canvas.height;) {
-        starts.push(y);
-        var end = y + slicePx;
-        if (end < canvas.height) {
-          var best = 0;
-          breaks.forEach(function (bp) { if (bp > y + slicePx * 0.4 && bp <= end) best = bp; });
-          if (best) end = best;
-        }
-        y = Math.min(end, canvas.height);
-      }
+    // 1. lay the whole letter out once and measure it
+    var measure = makeBox(cleanClone());
+    var container = measure.querySelector('.letter-container');
+    var cRect = container.getBoundingClientRect(), cs = getComputedStyle(container);
+    var contentTop = cRect.top + parseFloat(cs.borderTopWidth) + parseFloat(cs.paddingTop);
+    var contentH = cRect.bottom - parseFloat(cs.borderBottomWidth) - parseFloat(cs.paddingBottom) - contentTop;
+    var frameH = measure.offsetHeight - contentH;           // frame + padding around the content
+    var windowH = pageCss - frameH;                         // content height that fits inside one framed page
 
-      starts.forEach(function (y, i) {
-        var h = (i + 1 < starts.length ? starts[i + 1] : canvas.height) - y;
-        var part = document.createElement('canvas');
-        part.width = canvas.width; part.height = h;
-        var ctx = part.getContext('2d');
-        ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, part.width, h);
-        ctx.drawImage(canvas, 0, y, canvas.width, h, 0, 0, canvas.width, h);
-        if (i > 0) pdf.addPage();
-        pdf.addImage(part.toDataURL('image/jpeg', 0.95), 'JPEG', margin, margin, pageW, h * pageW / canvas.width);
-      });
-
-      // make links clickable in the PDF: map each link's on-screen box to its page
-      var mmPerPx = pageW / boxRect.width;
-      clone.querySelectorAll('a[href]').forEach(function (a) {
-        Array.prototype.forEach.call(a.getClientRects(), function (r) {
-          var top = (r.top - boxRect.top) * pxPerCss, page = 0;
-          while (page + 1 < starts.length && starts[page + 1] <= top) page++;
-          pdf.setPage(page + 1);
-          pdf.link(margin + (r.left - boxRect.left) * mmPerPx, margin + (top - starts[page]) / pxPerCss * mmPerPx,
-                   r.width * mmPerPx, r.height * mmPerPx, { url: a.href });
+    // 2. choose page breaks only in the gaps between lines of text / images, never through them
+    var offsets = [0];
+    if (measure.offsetHeight > pageCss) {
+      var spans = [], rng = document.createRange();
+      var walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT);
+      while (walker.nextNode()) {
+        if (!walker.currentNode.textContent.trim()) continue;
+        rng.selectNodeContents(walker.currentNode);
+        Array.prototype.forEach.call(rng.getClientRects(), function (r) {
+          if (r.height > 0) spans.push({ top: r.top - contentTop, bottom: r.bottom - contentTop });
         });
+      }
+      container.querySelectorAll('img, .highlight-box').forEach(function (el) {
+        var r = el.getBoundingClientRect();
+        spans.push({ top: r.top - contentTop, bottom: r.bottom - contentTop });
       });
+      spans.sort(function (x, y) { return x.top - y.top; });
+      var merged = [];
+      spans.forEach(function (sp) {
+        var last = merged[merged.length - 1];
+        if (last && sp.top < last.bottom) last.bottom = Math.max(last.bottom, sp.bottom);
+        else merged.push({ top: sp.top, bottom: sp.bottom });
+      });
+
+      var o = 0;
+      while (contentH - o > windowH) {
+        var limit = o + windowH, cut = limit;
+        for (var k = 0; k < merged.length; k++) {
+          var m = merged[k];
+          if (m.top < limit && m.bottom > limit) {            // this line/image would be cut
+            var prevBottom = k > 0 ? Math.max(merged[k - 1].bottom, o) : o;
+            var gapMid = Math.floor((prevBottom + m.top) / 2);
+            if (gapMid > o + windowH * 0.3) cut = gapMid;    // otherwise (huge image) cut where we must
+            break;
+          }
+        }
+        o = cut;
+        offsets.push(o);
+      }
+    }
+    measure.remove();
+
+    // 3. render each page as its own complete framed letter showing just its slice of the content
+    function buildPage(i) {
+      var start = offsets[i], end = i + 1 < offsets.length ? offsets[i + 1] : contentH;
+      var pc = cleanClone();
+      if (offsets.length > 1) {
+        var cont = pc.querySelector('.letter-container');
+        var viewport = document.createElement('div');
+        viewport.style.cssText = 'overflow:hidden;height:' + (end - start) + 'px';
+        var inner = document.createElement('div');
+        inner.style.transform = 'translateY(' + (-start) + 'px)';
+        while (cont.firstChild) inner.appendChild(cont.firstChild);
+        viewport.appendChild(inner);
+        cont.appendChild(viewport);
+      }
+      return makeBox(pc);
+    }
+
+    var pdf = new window.jspdf.jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait' });
+    var mmPerPx = pageW / BOX_W;
+    var chain = Promise.resolve();
+    offsets.forEach(function (_, i) {
+      chain = chain.then(function () {
+        var box = buildPage(i);
+        return htmlToImage.toCanvas(box, { pixelRatio: 2.5, backgroundColor: '#ffffff' }).then(function (canvas) {
+          if (i > 0) pdf.addPage();
+          pdf.addImage(canvas.toDataURL('image/jpeg', 0.95), 'JPEG', margin, margin, pageW, canvas.height * pageW / canvas.width);
+
+          // make links clickable in the PDF (only the parts visible on this page)
+          var boxRect = box.getBoundingClientRect();
+          var vp = box.querySelector('.letter-container > div[style*="overflow"]');
+          var vr = vp ? vp.getBoundingClientRect() : boxRect;
+          box.querySelectorAll('a[href]').forEach(function (a) {
+            Array.prototype.forEach.call(a.getClientRects(), function (r) {
+              if (r.bottom <= vr.top || r.top >= vr.bottom) return;
+              pdf.link(margin + (r.left - boxRect.left) * mmPerPx, margin + (r.top - boxRect.top) * mmPerPx,
+                       r.width * mmPerPx, r.height * mmPerPx, { url: a.href });
+            });
+          });
+        }).finally(function () { box.remove(); });
+      });
+    });
+
+    chain.then(function () {
       pdf.save(title + '.pdf');
     }).catch(function (err) {
       console.error(err);
       alert('הייצוא נכשל. נסו את כפתור "הדפסה" ובחרו "שמירה כ-PDF".');
     }).then(function () {
-      box.remove();
       document.body.classList.remove('exporting');
       btnPdf.disabled = false;
       btnPdf.textContent = '⬇ ייצוא ל-PDF';
